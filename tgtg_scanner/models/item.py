@@ -69,11 +69,11 @@ class Item:
         self.buffet: str = "Yes" if item.get("buffet", False) else "No"
         self.item_category: str = item.get("item_category", "-")
         self.description: str = item.get("description", "-")
-        item_price: dict = item.get("item_price", {})
+        self.item_price: dict = item.get("item_price", {})
         item_value: dict = item.get("item_value", {})
-        self._price: float = item_price.get("minor_units", 0) / 10 ** item_price.get("decimals", 0)
+        self._price: float = self.item_price.get("minor_units", 0) / 10 ** self.item_price.get("decimals", 0)
         self._value: float = item_value.get("minor_units", 0) / 10 ** item_value.get("decimals", 0)
-        self.currency: str = item_price.get("code", "-")
+        self.currency: str = self.item_price.get("code", "-")
         self.item_logo: str = item.get("logo_picture", {}).get(
             "current_url",
             "https://tgtg-mkt-cms-prod.s3.eu-west-1.amazonaws.com/13512/TGTG_Icon_White_Cirle_1988x1988px_RGB.png",
