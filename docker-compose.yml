@@ -1,6 +1,5 @@
 version: '3.8'
 
-
 services:
   scanner:
     ## image: derhenning/tgtg:latest-alpine
@@ -11,8 +10,6 @@ services:
        dockerfile: docker/Dockerfile.alpine
     env_file:
       - .env
-    environment:
-
     volumes:
       - tokens:/tokens
     ports:
