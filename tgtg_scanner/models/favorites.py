@@ -37,6 +37,13 @@ class Favorites:
         """
         return any(item for item in self.client.get_favorites() if Item(item).item_id == item_id)
 
+    def is_dynamic_favorite(self, item_id: str) -> bool:
+        """Returns true if the provided item ID is a dynamic favorite"""
+        log.debug("Checking if item %s is a dynamic favorite", item_id)
+        dynamic_favorites = [Item(item) for item in self.client.get_favorites() if Item(item).price_type == "gradual_lower_price"]
+        log.debug(f"dynamic favorites: {dynamic_favorites}")
+        return any(item for item in dynamic_favorites if item.item_id == item_id)
+
     def get_item_by_id(self, item_id: str) -> Item:
         """Gets an item by the Item ID
 

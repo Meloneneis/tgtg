@@ -529,7 +529,6 @@ class Config(BaseConfig):
 
     file: Union[str, None] = None
     item_ids: list[str] = field(default_factory=list)
-    notifications_exclude_ids: list[str] = field(default_factory=list)
     sleep_time: int = 60
     schedule_cron: Cron = field(default_factory=Cron)
     debug: bool = False
@@ -623,7 +622,6 @@ class Config(BaseConfig):
     def _read_env(self):
         self._env_get_list("ITEM_IDS", "item_ids")
         self._env_get_int("SLEEP_TIME", "sleep_time")
-        self._env_get_list("NOTIFICATIONS_EXCLUDE_IDS", "notifications_exclude_ids")
         self._env_get_cron("SCHEDULE_CRON", "schedule_cron")
         self._env_get_boolean("DEBUG", "debug")
         self._env_get("LOCALE", "locale")

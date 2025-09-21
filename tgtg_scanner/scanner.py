@@ -140,13 +140,12 @@ class Scanner:
         """
         state_item = self.state.get(item.item_id)
         if state_item is not None:
-            if state_item.items_available == item.items_available and state_item.item_price == item.item_price:
+            if state_item.items_available == item.items_available and state_item.price == item.price:
                 return
             log.info("%s - new amount: %s, new price: %s",item.display_name, item.items_available, item.price)
-            if state_item.items_available == 0 and item.items_available > 0:
-                if item.item_id not in self.config.notifications_exclude_ids:
-                    self._send_messages(item)
-                    self.metrics.send_notifications.labels(item.item_id, item.display_name).inc()
+            if state_item.items_available == 0 and item.items_available > 0 and item.price_type != "gradual_lower_price":
+                self._send_messages(item)
+                self.metrics.send_notifications.labels(item.item_id, item.display_name).inc()
         self.metrics.update(item)
         self.state[item.item_id] = item
 

@@ -116,6 +116,7 @@ class Telegram(Notifier):
             CommandHandler("addfavorites", self._add_favorites),
             CommandHandler("removefavorites", self._remove_favorites),
             CommandHandler("getid", self._get_id),
+            CommandHandler("setalertprice", self._set_alert_price),
             MessageHandler(
                 filters.Regex(r"^https:\/\/share\.toogoodtogo\.com\/item\/(\d+)\/?"),
                 self._url_handler,
@@ -142,6 +143,7 @@ class Telegram(Notifier):
                 BotCommand("addfavorites", "Add item ids to favorites"),
                 BotCommand("removefavorites", "Remove Item ids from favorites"),
                 BotCommand("getid", "Get your chat id"),
+                BotCommand("setalertprice", "Set the price for alert notifications"),
             ]
         )
         await self.application.start()
@@ -325,7 +327,16 @@ class Telegram(Notifier):
         if not favorites:
             await update.message.reply_text("You currently don't have any favorites.")
         else:
-            await update.message.reply_text("\n".join([f"• {item.item_id} - {item.display_name}" for item in favorites]))
+            await update.message.reply_text(
+                "\n".join([
+                    f"• id: {item.item_id}, price type: dynamic\n"
+                    f"  name: {item.display_name}"
+                    if item.price_type == "gradual_lower_price"
+                    else f"• id: {item.item_id}, price type: static\n"
+                         f"  name: {item.display_name}"
+                    for item in favorites
+                ])
+            )
 
     @_private
     async def _list_favorite_ids(self, update: Update, _) -> None:
@@ -497,6 +508,33 @@ class Telegram(Notifier):
                 "For persistence please set TELEGRAM_CHAT_IDS=%s",
                 ",".join(self.chat_ids),
             )
+
+    @_private
+    async def _set_alert_price(self, update: Update, context: CallbackContext) -> None:
+        if not context.args:
+            await update.message.reply_text(
+                "Please supply item id and alert price in one of the following ways: "
+                "'/setalertprice 12345 5.99' or "
+                "'/setalertprice 12345,5.99'"
+            )
+            return
+        args = list(
+            filter(
+                bool,
+                map(
+                    str.strip,
+                    [split_args for arg in context.args for split_args in arg.split(",")],
+                ),
+            )
+        )
+        log.debug(f"args: {args}")
+        if not self.favorites.is_dynamic_favorite(args[0]):
+            await update.message.reply_text("Can't set alert price for non dynamic items!")
+            return
+
+        # TODO: implement api request to alert manager
+        await update.message.reply_text(f"Set alert price for {args[0]} to {args[1]}€")
+        log.debug(f"Set alert price for {args[0]} to {args[1]}€")
 
     def __repr__(self) -> str:
         return f"Telegram: {self.chat_ids}"
