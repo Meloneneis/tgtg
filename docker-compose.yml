@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   scanner:
     ## image: derhenning/tgtg:latest-alpine
@@ -7,28 +5,36 @@ services:
     ## image: tgtg-scanner:latest                   ## locally build image
     build:                                       ## build image with compose
        context: .
-       dockerfile: docker/Dockerfile.alpine
+       dockerfile: docker/Dockerfile
     env_file:
       - .env
+    environment:
+      TELEGRAM: true
+      SLEEP_TIME: 60
+      TZ: Europe/Berlin
+      LOCALE: de_DE
+      METRICS: true
+      METRICS_PORT: "8000"
     volumes:
       - tokens:/tokens
+      - alertprice_data:/alertprice_data
     ports:
       # Expose the metrics port to the host and other containers
       - "8000:8000"
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v3.5.0
     container_name: prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
     ports:
-      - 9090:9090
+      - "9090:9090"
     restart: unless-stopped
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
       - prom_data:/prometheus
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:12.2
     container_name: grafana
     ports:
       - "3000:3000"
@@ -39,7 +45,9 @@ services:
       - .env
     depends_on:
       - prometheus
+
 volumes:
   prom_data:
   tokens:
   grafana-storage:
+  alertprice_data:

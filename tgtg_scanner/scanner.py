@@ -15,6 +15,7 @@ from tgtg_scanner.models import (
     Location,
     Metrics,
     Reservations,
+    AlertManager
 )
 from tgtg_scanner.notifiers import Notifiers
 from tgtg_scanner.tgtg import TgtgClient
@@ -66,7 +67,8 @@ class Scanner:
             base_url=self.config.tgtg.base_url,
         )
         self.reservations = Reservations(self.tgtg_client)
-        self.favorites = Favorites(self.tgtg_client)
+        self.alert_manager = AlertManager()
+        self.favorites = Favorites(self.tgtg_client, self.alert_manager)
 
     def _get_test_item(self) -> Item:
         """
@@ -103,6 +105,13 @@ class Scanner:
             except TgtgAPIError as err:
                 log.error(err)
         items += self._get_favorites()
+        current_favorite_ids = {item.item_id for item in items}
+        alert_price_ids = set(self.alert_manager.alert_prices.keys())
+        ids_to_delete = alert_price_ids - current_favorite_ids
+        for item_id in ids_to_delete:
+            self.alert_manager.delete_price(item_id)
+            log.info(f"Deleted stale alert price for item ID {item_id}")
+
         for item in items:
             self._check_item(item)
 
