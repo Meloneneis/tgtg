@@ -2,7 +2,7 @@ import logging
 import sys
 from random import random
 from time import sleep
-from typing import Dict, List, NoReturn, Union
+from typing import NoReturn, Union
 
 from progress.spinner import Spinner
 
@@ -25,7 +25,7 @@ log = logging.getLogger("tgtg")
 
 
 class Activity:
-    """Activity class that creates a spinner if active is True"""
+    """Activity class that creates a spinner if active is True."""
 
     def __init__(self, active: bool):
         self.active = active
@@ -34,19 +34,19 @@ class Activity:
             self.spinner = Spinner("Scanning... ")
 
     def next(self) -> None:
-        """Next function that updates the spinner"""
+        """Next function that updates the spinner."""
         if self.spinner:
             self.spinner.next()
 
     def flush(self) -> None:
-        """Flush function that flushes the spinner"""
+        """Flush function that flushes the spinner."""
         if self.spinner:
             sys.stdout.write("\x1b[80D\x1b[K")
             sys.stdout.flush()
 
 
 class Scanner:
-    """Main Scanner class"""
+    """Main Scanner class."""
 
     def __init__(self, config: Config):
         self.config = config
@@ -54,7 +54,7 @@ class Scanner:
         self.metrics = Metrics(port=self.config.metrics_port)
         self.item_ids = set(self.config.item_ids)
         self.cron = self.config.schedule_cron
-        self.state: Dict[str, Item] = {}
+        self.state: dict[str, Item] = {}
         self.notifiers: Union[Notifiers, None] = None
         self.location: Union[Location, None] = None
         self.tgtg_client = TgtgClient(
@@ -72,9 +72,7 @@ class Scanner:
         self.favorites = Favorites(self.tgtg_client, self.alert_manager)
 
     def _get_test_item(self) -> Item:
-        """
-        Returns an item for test notifications
-        """
+        """Returns an item for test notifications."""
         items = sorted(self._get_favorites(), key=lambda x: x.items_available, reverse=True)
 
         if items:
@@ -91,9 +89,7 @@ class Scanner:
         return items[0]
 
     def _job(self) -> None:
-        """
-        Job iterates over all monitored items
-        """
+        """Job iterates over all monitored items."""
         if self.notifiers is None:
             raise RuntimeError("Notifiers not initialized!")
 
@@ -133,11 +129,11 @@ class Scanner:
         )
 
     def _get_favorites(self) -> list[Item]:
-        """
-        Get favorites as list of Items
+        """Get favorites as list of Items.
 
         Returns:
             List: List of items
+
         """
         try:
             items = self.get_favorites()
@@ -147,8 +143,7 @@ class Scanner:
         return [Item(item, self.location, self.config.locale) for item in items]
 
     def _check_item(self, item: Union[Item, DynamicItem]) -> None:
-        """
-        Checks if the available item amount raised from zero to something
+        """Checks if the available item amount raised from zero to something
         and triggers notifications.
         """
         state_item = self.state.get(item.item_id)
@@ -168,11 +163,8 @@ class Scanner:
         self.metrics.update(item, self.alert_manager)
         self.state[item.item_id] = item
 
-
     def _send_messages(self, item: Item) -> None:
-        """
-        Send notifications for Item
-        """
+        """Send notifications for Item."""
         if self.notifiers is None:
             raise RuntimeError("Notifiers not initialized!")
 
@@ -184,9 +176,7 @@ class Scanner:
         self.notifiers.send(item)
 
     def run(self) -> NoReturn:
-        """
-        Main Loop of the Scanner
-        """
+        """Main Loop of the Scanner."""
         # test tgtg API
         self.tgtg_client.login()
         self.config.save_tokens(
@@ -236,9 +226,7 @@ class Scanner:
                 sleep(60)
 
     def stop(self) -> None:
-        """
-        Stop scanner.
-        """
+        """Stop scanner."""
         if self.notifiers:
             self.notifiers.stop()
 
@@ -248,10 +236,11 @@ class Scanner:
         Returns:
             dict: dictionary containing access token, refresh token,
                   user id and datadome cookie
+
         """
         return self.tgtg_client.get_credentials()
 
-    def get_items(self, lat, lng, radius) -> List[dict]:
+    def get_items(self, lat, lng, radius) -> list[dict]:
         """Get items by geographic position.
 
         Args:
@@ -261,6 +250,7 @@ class Scanner:
 
         Returns:
             List: List of found items
+
         """
         return self.tgtg_client.get_items(
             favorites_only=False,
@@ -269,11 +259,12 @@ class Scanner:
             radius=radius,
         )
 
-    def get_favorites(self) -> List[dict]:
-        """Returns favorites of the current tgtg account
+    def get_favorites(self) -> list[dict]:
+        """Returns favorites of the current tgtg account.
 
         Returns:
             List: List of items
+
         """
         return self.tgtg_client.get_favorites()
 
@@ -282,6 +273,7 @@ class Scanner:
 
         Args:
             item_id (str): Item ID
+
         """
         self.tgtg_client.set_favorite(item_id=item_id, is_favorite=True)
 
@@ -290,6 +282,7 @@ class Scanner:
 
         Args:
             item_id (str): Item ID
+
         """
         self.tgtg_client.set_favorite(item_id=item_id, is_favorite=False)
 

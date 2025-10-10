@@ -1,4 +1,6 @@
-FROM python:3.11-slim
+ARG PYTHON_VERSION=3.13
+
+FROM python:${PYTHON_VERSION} AS builder
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -8,13 +10,27 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_ROOT_USER_ACTION=ignore \
     AIOHTTP_NO_EXTENSIONS=1 \
     MULTIDICT_NO_EXTENSIONS=1 \
-    YARL_NO_EXTENSIONS=1
-ENV TGTG_TOKEN_PATH=/tokens
-ENV TGTG_ALERTPRICE_PATH=/alertprice_data
-ENV LOGS_PATH=/logs
-ENV DOCKER=true
-ENV UID=1000
-ENV GID=1000
+    YARL_NO_EXTENSIONS=1 \
+    PATH="/opt/venv/bin:$PATH"
+
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y build-essential
+
+RUN --mount=type=bind,target=/context \
+    python -m venv /opt/venv && \
+    pip install -r /context/requirements.txt && \
+    pip install /context
+
+FROM python:${PYTHON_VERSION}-slim
+
+ENV TGTG_TOKEN_PATH=/tokens \
+    TGTG_ALERTPRICE_PATH=/alertprice_data \
+    LOGS_PATH=/logs \
+    DOCKER=true \
+    UID=1000 \
+    GID=1000 \
+    PATH="/opt/venv/bin:$PATH"
 
 RUN addgroup --gid ${GID} tgtg && \
     adduser --shell /bin/false \
@@ -30,10 +46,6 @@ RUN chown tgtg:tgtg ${TGTG_TOKEN_PATH}
 RUN chown tgtg:tgtg ${TGTG_ALERTPRICE_PATH}
 VOLUME ${TGTG_TOKEN_PATH}
 VOLUME ${TGTG_ALERTPRICE_PATH}
-
-RUN --mount=type=bind,target=/context \
-    pip install -r /context/requirements.txt && \
-    pip install /context
 
 COPY ./docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

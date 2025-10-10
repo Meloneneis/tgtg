@@ -47,9 +47,7 @@ def format_interval_today_tomorrow(pickup_interval_start: str, pickup_interval_e
 
 
 class Metrics:
-    """
-    Provides a prometheus metrics client.
-    """
+    """Provides a prometheus metrics client."""
 
     def __init__(self, port: int = 8000):
         self.port = port
@@ -69,12 +67,12 @@ class Metrics:
         )
 
     def enable_metrics(self) -> None:
-        """
-        Start the metrics http server.
-        """
+        """Start the metrics http server."""
         start_http_server(self.port)
         log.info("Metrics server started on port %s", self.port)
 
+    def update(self, item: Item) -> None:
+        """Update the metrics."""
     def update(self, item: Item, alert_manager: AlertManager) -> None:
         """
         Update the metrics.
