@@ -9,6 +9,7 @@ from functools import wraps
 from queue import Empty
 from time import sleep
 from typing import Union
+import re
 
 from telegram import BotCommand, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
@@ -32,7 +33,7 @@ from telegram.helpers import escape_markdown
 from telegram.warnings import PTBUserWarning
 
 from tgtg_scanner.errors import MaskConfigurationError, TelegramConfigurationError
-from tgtg_scanner.models import Config, Favorites, Item, Reservations
+from tgtg_scanner.models import Config, Favorites, Item, Reservations, DynamicItem
 from tgtg_scanner.models.favorites import AddFavoriteRequest, RemoveFavoriteRequest
 from tgtg_scanner.models.reservations import Order, Reservation
 from tgtg_scanner.notifiers.base import Notifier
@@ -112,10 +113,12 @@ class Telegram(Notifier):
             CommandHandler("orders", self._cancel_orders_menu),
             CommandHandler("cancelall", self._cancel_all_orders),
             CommandHandler("listfavorites", self._list_favorites),
+            CommandHandler("setalerts", self._set_alerts),
             CommandHandler("listfavoriteids", self._list_favorite_ids),
             CommandHandler("addfavorites", self._add_favorites),
             CommandHandler("removefavorites", self._remove_favorites),
             CommandHandler("getid", self._get_id),
+            MessageHandler(filters.TEXT & ~filters.COMMAND, self._receive_alert_price),
             MessageHandler(
                 filters.Regex(r"^https:\/\/share\.toogoodtogo\.com\/item\/(\d+)\/?"),
                 self._url_handler,
@@ -138,6 +141,7 @@ class Telegram(Notifier):
                 BotCommand("orders", "List and cancel active Orders"),
                 BotCommand("cancelall", "Cancels all active orders"),
                 BotCommand("listfavorites", "List all favorites"),
+                BotCommand("setalerts", "Set alert for dynamic favorites"),
                 BotCommand("listfavoriteids", "List all item ids from favorites"),
                 BotCommand("addfavorites", "Add item ids to favorites"),
                 BotCommand("removefavorites", "Remove Item ids from favorites"),
@@ -325,7 +329,67 @@ class Telegram(Notifier):
         if not favorites:
             await update.message.reply_text("You currently don't have any favorites.")
         else:
-            await update.message.reply_text("\n".join([f"• {item.item_id} - {item.display_name}" for item in favorites]))
+            await update.message.reply_text(
+                "\n".join([f"• {item.item_id} - {item.display_name}" for item in favorites]))
+
+    @_private
+    async def _receive_alert_price(self, update: Update, context: CallbackContext) -> None:
+        # Check if we are actually waiting for a price from this user
+        if 'item_to_set_price' in context.user_data:
+            item_id = context.user_data['item_to_set_price']
+
+            try:
+                price_text = update.message.text.replace(',', '.')  # Handle both . and ,
+                new_price = float(price_text)
+
+                self.favorites.alert_manager.set_price(item_id, new_price)
+
+                await update.message.reply_text(
+                    f"Alert price has been set to {new_price:.2f}€."
+                )
+
+            except ValueError:
+                await update.message.reply_text("That doesn't look like a valid price. Please write a number.")
+                return
+
+            del context.user_data['item_to_set_price']
+
+    @_private
+    async def _set_alerts(self, update: Update, _) -> None:
+        dynamic_favorites = self.favorites.get_dynamic_favorites()
+        if not dynamic_favorites:
+            await update.message.reply_text("You currently don't have any dynamic favorites.")
+        else:
+            buttons = []
+            for item in dynamic_favorites:
+                store_name = item.display_name.split()[0]
+
+                # Location logic: prefers content in parentheses, falls back to the text after '-'.
+                location = ""
+                match = re.search(r'\(([^)]*)\)', item.display_name)
+                if match:
+                    location = match.group(1)
+                elif '-' in item.display_name:
+                    parts = item.display_name.split('-', 1)
+                    if len(parts) > 1 and parts[1].strip():
+                        location = parts[1].strip()
+
+                base_text = store_name
+                if location:
+                    base_text += f" - {location}"
+
+                # Truncate to the max length of 30 characters if the combined text is too long.
+                if len(base_text) > 30:
+                    base_text = base_text[:29] + "…"
+
+                alert_status = f"Alert at {item.alert_price:.2f}€" if item.alert_price is not None \
+                    else "No Alert Set"
+
+                button_text = f"{base_text} | {alert_status}"
+                buttons.append([InlineKeyboardButton(button_text, callback_data=item)])
+
+            reply_markup = InlineKeyboardMarkup(buttons)
+            await update.message.reply_text("Select an Item to set Alert Price for", reply_markup=reply_markup)
 
     @_private
     async def _list_favorite_ids(self, update: Update, _) -> None:
@@ -431,9 +495,23 @@ class Telegram(Notifier):
                 ),
             )
 
-    async def _callback_query_handler(self, update: Update, _) -> None:
+    async def _callback_query_handler(self, update: Update, context: CallbackContext) -> None:
         data = update.callback_query.data
-        if isinstance(data, Item):
+        if isinstance(data, DynamicItem):
+            context.user_data['item_to_set_price'] = data.item_id
+            await update.callback_query.answer()
+            # Get the part before the hyphen
+            store_name = data.display_name.split('-', 1)[0].strip()
+
+            # Use a regular expression to find the text between the first '(' and last ')'
+            match = re.search(r'\((.*)\)', data.display_name)
+            location = match.group(1) if match else ""  # Get the text, or an empty string if not found
+
+            # Combine them in the reply
+            await update.callback_query.message.reply_text(
+                f"Please write the new alert price for '{store_name} ({location})'."
+            )
+        elif isinstance(data, Item):
             self.reservations.reserve(data.item_id, data.display_name)
             await update.callback_query.answer(f"Added {data.display_name} to reservation queue")
             log.debug('Added "%s" to reservation queue', data.display_name)

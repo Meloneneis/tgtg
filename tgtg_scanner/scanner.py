@@ -12,9 +12,11 @@ from tgtg_scanner.models import (
     Cron,
     Favorites,
     Item,
+    DynamicItem,
     Location,
     Metrics,
     Reservations,
+    AlertManager
 )
 from tgtg_scanner.notifiers import Notifiers
 from tgtg_scanner.tgtg import TgtgClient
@@ -48,7 +50,8 @@ class Scanner:
 
     def __init__(self, config: Config):
         self.config = config
-        self.metrics = Metrics(self.config.metrics_port)
+        self.alert_manager = AlertManager()
+        self.metrics = Metrics(port=self.config.metrics_port)
         self.item_ids = set(self.config.item_ids)
         self.cron = self.config.schedule_cron
         self.state: Dict[str, Item] = {}
@@ -66,7 +69,7 @@ class Scanner:
             base_url=self.config.tgtg.base_url,
         )
         self.reservations = Reservations(self.tgtg_client)
-        self.favorites = Favorites(self.tgtg_client)
+        self.favorites = Favorites(self.tgtg_client, self.alert_manager)
 
     def _get_test_item(self) -> Item:
         """
@@ -103,7 +106,17 @@ class Scanner:
             except TgtgAPIError as err:
                 log.error(err)
         items += self._get_favorites()
+        current_favorite_ids = {item.item_id for item in items}
+        alert_price_ids = set(self.alert_manager.alert_prices.keys())
+        ids_to_delete = alert_price_ids - current_favorite_ids
+        for item_id in ids_to_delete:
+            self.alert_manager.delete_price(item_id)
+            log.info(f"Deleted stale alert price for item ID {item_id}")
+
         for item in items:
+            if getattr(item, "price_type", None) == "gradual_lower_price":
+                item.__class__ = DynamicItem
+                item.alert_price = self.alert_manager.get_price(item.item_id)
             self._check_item(item)
 
         amounts = {item_id: item.items_available for item_id, item in self.state.items() if item is not None}
@@ -133,22 +146,28 @@ class Scanner:
             return []
         return [Item(item, self.location, self.config.locale) for item in items]
 
-    def _check_item(self, item: Item) -> None:
+    def _check_item(self, item: Union[Item, DynamicItem]) -> None:
         """
         Checks if the available item amount raised from zero to something
         and triggers notifications.
         """
         state_item = self.state.get(item.item_id)
         if state_item is not None:
-            if state_item.items_available == item.items_available and state_item.item_price == item.item_price:
+            if (
+                    state_item.items_available == item.items_available
+                    and state_item.price == item.price
+                    and (not isinstance(item, DynamicItem) or state_item.alert_price == item.alert_price)
+            ):
                 return
-            log.info("%s - new amount: %s, new price: %s",item.display_name, item.items_available, item.price)
-            if state_item.items_available == 0 and item.items_available > 0:
-                if item.item_id not in self.config.notifications_exclude_ids:
-                    self._send_messages(item)
-                    self.metrics.send_notifications.labels(item.item_id, item.display_name).inc()
-        self.metrics.update(item)
+            log.info("%s - new amount: %s, new price: %s, new alert price: %s",
+                     item.display_name, item.items_available, item.price, item.alert_price)
+            if state_item.items_available == 0 and item.items_available > 0 and not isinstance(item, DynamicItem):
+                # sending notification for non-dynamic item on availability
+                self._send_messages(item)
+                self.metrics.send_notifications.labels(item.item_id, item.display_name).inc()
+        self.metrics.update(item, self.alert_manager)
         self.state[item.item_id] = item
+
 
     def _send_messages(self, item: Item) -> None:
         """

@@ -10,6 +10,7 @@ ENV PYTHONUNBUFFERED=1 \
     MULTIDICT_NO_EXTENSIONS=1 \
     YARL_NO_EXTENSIONS=1
 ENV TGTG_TOKEN_PATH=/tokens
+ENV TGTG_ALERTPRICE_PATH=/alertprice_data
 ENV LOGS_PATH=/logs
 ENV DOCKER=true
 ENV UID=1000
@@ -23,9 +24,12 @@ RUN addgroup --gid ${GID} tgtg && \
             tgtg
 RUN mkdir -p ${LOGS_PATH}
 RUN mkdir -p ${TGTG_TOKEN_PATH}
+RUN mkdir -p ${TGTG_ALERTPRICE_PATH}
 RUN chown tgtg:tgtg ${LOGS_PATH}
 RUN chown tgtg:tgtg ${TGTG_TOKEN_PATH}
+RUN chown tgtg:tgtg ${TGTG_ALERTPRICE_PATH}
 VOLUME ${TGTG_TOKEN_PATH}
+VOLUME ${TGTG_ALERTPRICE_PATH}
 
 RUN --mount=type=bind,target=/context \
     pip install -r /context/requirements.txt && \
