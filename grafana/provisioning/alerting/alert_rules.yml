@@ -1,0 +1,63 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: price_alerts
+    folder: Price Alerts
+    interval: 10s
+    rules:
+      - uid: tgtg_price_alert
+        title: TGTG Price Alert
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 60
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: (tgtg_item_alert_difference > 0) and (tgtg_item_count > 0)
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  type: query
+              refId: C
+        noDataState: NoData
+        execErrState: OK
+        for: 0m
+        annotations:
+          summary: "{{ $labels.display_name }} - Price Alert!"
+          description: |
+            🎉 Lai dou lai le, mai yige ba!!
+            
+            Store: {{ $labels.display_name }}
+            Current Price: {{ $labels.item_price }}€
+            Items Available: {{ $labels.items_available }}
+            Pickup Window: {{ $labels.pickup_interval}}
+        labels: {}
