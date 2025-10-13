@@ -48,7 +48,7 @@ groups:
                       - B
                   type: query
               refId: C
-        noDataState: NoData
+        noDataState: OK
         execErrState: OK
         for: 0m
         annotations:
