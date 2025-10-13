@@ -1,11 +1,11 @@
 services:
   scanner:
-    ## image: derhenning/tgtg:latest-alpine
-    ## pre build image from docker hub
+    image: meloneneis/tgtg-scanner:latest
+    ## pre-build image from docker hub
     ## image: tgtg-scanner:latest                   ## locally build image
-    build:                                       ## build image with compose
-       context: .
-       dockerfile: docker/Dockerfile
+    ## build:                                       ## build image with compose
+    ##   context: .
+    ##   dockerfile: docker/Dockerfile
     env_file:
       - .env
     environment:
