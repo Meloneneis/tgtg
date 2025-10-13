@@ -12,7 +12,7 @@ groups:
         data:
           - refId: A
             relativeTimeRange:
-              from: 60
+              from: 20
               to: 0
             datasourceUid: prometheus
             model:
@@ -54,10 +54,8 @@ groups:
         annotations:
           summary: "{{ $labels.display_name }} - Price Alert!"
           description: |
-            🎉 Lai dou lai le, mai yige ba!!
+            🎉 Shihou shi le, mai yige ba!!
             
             Store: {{ $labels.display_name }}
-            Current Price: {{ $labels.item_price }}€
-            Items Available: {{ $labels.items_available }}
             Pickup Window: {{ $labels.pickup_interval}}
         labels: {}

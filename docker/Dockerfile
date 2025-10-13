@@ -48,7 +48,7 @@ VOLUME ${TGTG_TOKEN_PATH}
 VOLUME ${TGTG_ALERTPRICE_PATH}
 
 COPY ./docker/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+COPY --from=builder /opt/venv /opt/venv
 
 RUN python -m tgtg_scanner -v
 

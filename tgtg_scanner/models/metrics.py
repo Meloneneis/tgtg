@@ -51,7 +51,7 @@ class Metrics:
 
     def __init__(self, port: int = 8000):
         self.port = port
-        item_params = ["item_id", "display_name", "items_available", "pickup_interval", "item_price"]
+        item_params = ["item_id", "display_name", "pickup_interval"]
         self.item_count = Gauge("tgtg_item_count", "Currently available Magic Bags", item_params)
         self.item_price = Gauge("tgtg_item_price", "Price for a Magic Bag", item_params)
         self.item_value = Gauge("tgtg_item_value", "Value for a Magic Bag", item_params)
@@ -71,27 +71,16 @@ class Metrics:
         start_http_server(self.port)
         log.info("Metrics server started on port %s", self.port)
 
-    def update(self, item: Item) -> None:
-        """Update the metrics."""
     def update(self, item: Item, alert_manager: AlertManager) -> None:
         """
         Update the metrics.
         """
         try:
             pickup_interval = format_interval_today_tomorrow(item.pickup_interval_start, item.pickup_interval_end)
-            item_labels = [
-                item.item_id,
-                item.display_name,
-                str(item.items_available),
-                pickup_interval,
-                str(item._price)
-            ]
-
+            item_labels = [item.item_id,item.display_name, pickup_interval]
             self.item_count.labels(*item_labels).set(item.items_available)
             self.item_price.labels(*item_labels).set(item._price)
             self.item_value.labels(*item_labels).set(item._value)
-
-            # Check if this item has an alert price configured
             alert_price = alert_manager.get_price(item.item_id)
             if alert_price is not None:
                 self.item_alert_difference.labels(*item_labels).set(alert_price - item._price)
